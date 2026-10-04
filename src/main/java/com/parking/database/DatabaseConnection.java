@@ -8,7 +8,18 @@ public class DatabaseConnection {
 
     private static final String URL = "jdbc:sqlite:parking.db";
 
+    private DatabaseConnection() {
+        // Prevent creating an instance of this class
+    }
+
     public static Connection connect() throws SQLException {
-        return DriverManager.getConnection(URL);
+        Connection connection = DriverManager.getConnection(URL);
+
+        // Enable foreign key support in SQLite
+        try (var statement = connection.createStatement()) {
+            statement.execute("PRAGMA foreign_keys = ON");
+        }
+
+        return connection;
     }
 }
