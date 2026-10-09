@@ -3,6 +3,7 @@
 // Finding the parking lot by ID.
 // Retrieving all parking lot records.
 
+
 package com.parking.services;
 
 import com.parking.database.DatabaseConnection;
@@ -12,13 +13,23 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class ParkingLotService {
 
+    private static final DateTimeFormatter TIME_FORMAT =
+            DateTimeFormatter.ofPattern("HH:mm")
+                    .withResolverStyle(ResolverStyle.STRICT);
+
     public int save(ParkingLot parkingLot) throws SQLException {
+        validate(parkingLot);
+
         String sql = """
                 INSERT INTO parking_lot
                 (name, total_spaces, operating_start, operating_end)
@@ -53,6 +64,13 @@ public class ParkingLotService {
     }
 
     public boolean update(ParkingLot parkingLot) throws SQLException {
+        validate(parkingLot);
+
+        if (parkingLot.getId() <= 0) {
+            throw new IllegalArgumentException(
+                    "A valid parking lot ID is required.");
+        }
+
         String sql = """
                 UPDATE parking_lot
                 SET name = ?,
@@ -110,6 +128,41 @@ public class ParkingLotService {
         }
 
         return parkingLots;
+    }
+
+    private void validate(ParkingLot parkingLot) {
+        if (parkingLot == null) {
+            throw new IllegalArgumentException(
+                    "Parking lot cannot be null.");
+        }
+
+        if (parkingLot.getName() == null
+                || parkingLot.getName().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Parking lot name is required.");
+        }
+
+        if (parkingLot.getTotalSpaces() <= 0) {
+            throw new IllegalArgumentException(
+                    "Total parking spaces must be greater than zero.");
+        }
+
+        validateTime(parkingLot.getOperatingStart(), "Operating start");
+        validateTime(parkingLot.getOperatingEnd(), "Operating end");
+    }
+
+    private void validateTime(String time, String fieldName) {
+        if (time == null || time.isBlank()) {
+            throw new IllegalArgumentException(
+                    fieldName + " time is required.");
+        }
+
+        try {
+            LocalTime.parse(time, TIME_FORMAT);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                    fieldName + " time must use HH:mm format (00:00–23:59).");
+        }
     }
 
     private ParkingLot mapRow(ResultSet resultSet) throws SQLException {

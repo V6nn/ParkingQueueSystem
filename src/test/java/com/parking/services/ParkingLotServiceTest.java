@@ -135,4 +135,82 @@ public class ParkingLotServiceTest {
 
         assertFalse(result.isPresent());
     }
+
+    @Test
+    public void rejectBlankParkingLotName() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                0, "   ", 100, "06:00", "22:00");
+
+        try {
+            service.save(parkingLot);
+            fail("Expected blank name to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("name"));
+        }
+    }
+
+    @Test
+    public void rejectZeroParkingSpaces() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                0, "Test Lot", 0, "06:00", "22:00");
+
+        try {
+            service.save(parkingLot);
+            fail("Expected zero capacity to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("spaces"));
+        }
+    }
+
+    @Test
+    public void rejectNegativeParkingSpaces() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                0, "Test Lot", -10, "06:00", "22:00");
+
+        try {
+            service.save(parkingLot);
+            fail("Expected negative capacity to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("spaces"));
+        }
+    }
+
+    @Test
+    public void rejectInvalidOperatingStartTime() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                0, "Test Lot", 100, "25:90", "22:00");
+
+        try {
+            service.save(parkingLot);
+            fail("Expected invalid start time to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("HH:mm"));
+        }
+    }
+
+    @Test
+    public void rejectMissingOperatingEndTime() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                0, "Test Lot", 100, "06:00", "");
+
+        try {
+            service.save(parkingLot);
+            fail("Expected missing end time to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("required"));
+        }
+    }
+
+    @Test
+    public void rejectInvalidDataWhenUpdating() throws SQLException {
+        ParkingLot parkingLot = new ParkingLot(
+                999999, "Test Lot", 0, "06:00", "22:00");
+
+        try {
+            service.update(parkingLot);
+            fail("Expected invalid capacity to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("spaces"));
+        }
+    }
 }
