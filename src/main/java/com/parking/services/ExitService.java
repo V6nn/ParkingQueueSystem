@@ -164,6 +164,12 @@ public class ExitService {
             throw new IllegalArgumentException(
                     "Status must be OPEN or CLOSED.");
         }
+
+        if (exit.getStatus().equalsIgnoreCase("CLOSED")
+                && exit.getActiveLanes() != 0) {
+            throw new IllegalArgumentException(
+                    "A closed exit must have zero active lanes.");
+        }
     }
 
     private Exit mapRow(ResultSet resultSet) throws SQLException {

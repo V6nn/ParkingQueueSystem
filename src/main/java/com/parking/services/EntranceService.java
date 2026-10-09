@@ -165,6 +165,12 @@ public class EntranceService {
             throw new IllegalArgumentException(
                     "Status must be OPEN or CLOSED.");
         }
+
+        if (entrance.getStatus().equalsIgnoreCase("CLOSED")
+                && entrance.getActiveLanes() != 0) {
+            throw new IllegalArgumentException(
+                    "A closed entrance must have zero active lanes.");
+        }
     }
 
     private Entrance mapRow(ResultSet resultSet) throws SQLException {

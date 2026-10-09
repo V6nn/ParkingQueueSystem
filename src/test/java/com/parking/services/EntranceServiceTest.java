@@ -63,7 +63,7 @@ public class EntranceServiceTest {
 
         entrance.setName("Updated Test Entrance B");
         entrance.setLaneCount(4);
-        entrance.setActiveLanes(3);
+        entrance.setActiveLanes(0);
         entrance.setStatus("CLOSED");
 
         assertTrue(service.update(entrance));
@@ -73,7 +73,7 @@ public class EntranceServiceTest {
         assertTrue(result.isPresent());
         assertEquals("Updated Test Entrance B", result.get().getName());
         assertEquals(4, result.get().getLaneCount());
-        assertEquals(3, result.get().getActiveLanes());
+        assertEquals(0, result.get().getActiveLanes());
         assertEquals("CLOSED", result.get().getStatus());
     }
 
@@ -119,5 +119,12 @@ public class EntranceServiceTest {
     @Test(expected = IllegalArgumentException.class)
     public void rejectDeleteWithInvalidId() throws SQLException {
         service.delete(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectClosedEntranceWithActiveLanes() throws SQLException {
+        service.save(
+            new Entrance(0, "Invalid Closed Entrance", 2, 1, "CLOSED")
+        );
     }
 }

@@ -60,7 +60,7 @@ public class ExitServiceTest {
 
         exit.setName("Updated Test Exit B");
         exit.setLaneCount(4);
-        exit.setActiveLanes(3);
+        exit.setActiveLanes(0);
         exit.setStatus("CLOSED");
 
         assertTrue(service.update(exit));
@@ -70,7 +70,7 @@ public class ExitServiceTest {
         assertTrue(result.isPresent());
         assertEquals("Updated Test Exit B", result.get().getName());
         assertEquals(4, result.get().getLaneCount());
-        assertEquals(3, result.get().getActiveLanes());
+        assertEquals(0, result.get().getActiveLanes());
         assertEquals("CLOSED", result.get().getStatus());
     }
 
@@ -114,5 +114,12 @@ public class ExitServiceTest {
     @Test(expected = IllegalArgumentException.class)
     public void rejectDeleteWithInvalidId() throws SQLException {
         service.delete(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectClosedExitWithActiveLanes() throws SQLException {
+        service.save(
+            new Exit(0, "Invalid Closed Exit", 2, 1, "CLOSED")
+        );
     }
 }
