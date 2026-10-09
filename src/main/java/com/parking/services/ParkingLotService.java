@@ -36,30 +36,43 @@ public class ParkingLotService {
                 VALUES (?, ?, ?, ?)
                 """;
 
-        try (Connection connection = DatabaseConnection.connect();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
+        try (Connection connection = DatabaseConnection.connect()) {
 
-            statement.setString(1, parkingLot.getName());
-            statement.setInt(2, parkingLot.getTotalSpaces());
-            statement.setString(3, parkingLot.getOperatingStart());
-            statement.setString(4, parkingLot.getOperatingEnd());
+            String checkSql = "SELECT COUNT(*) FROM parking_lot";
 
-            statement.executeUpdate();
+            try (PreparedStatement checkStatement =
+                        connection.prepareStatement(checkSql);
+                ResultSet resultSet = checkStatement.executeQuery()) {
 
-            try (PreparedStatement idStatement =
-                         connection.prepareStatement(
-                                 "SELECT last_insert_rowid()");
-                 ResultSet resultSet = idStatement.executeQuery()) {
+                if (resultSet.next() && resultSet.getInt(1) > 0) {
+                    throw new IllegalStateException(
+                            "Only one parking lot is allowed.");
+                }
+            }
 
-                if (resultSet.next()) {
-                    int id = resultSet.getInt(1);
-                    parkingLot.setId(id);
-                    return id;
+            try (PreparedStatement statement =
+                        connection.prepareStatement(sql)) {
+
+                statement.setString(1, parkingLot.getName());
+                statement.setInt(2, parkingLot.getTotalSpaces());
+                statement.setString(3, parkingLot.getOperatingStart());
+                statement.setString(4, parkingLot.getOperatingEnd());
+
+                statement.executeUpdate();
+
+                try (PreparedStatement idStatement =
+                            connection.prepareStatement(
+                                    "SELECT last_insert_rowid()");
+                    ResultSet resultSet = idStatement.executeQuery()) {
+
+                    if (resultSet.next()) {
+                        int id = resultSet.getInt(1);
+                        parkingLot.setId(id);
+                        return id;
+                    }
                 }
             }
         }
-
         throw new SQLException("Could not retrieve the parking lot ID.");
     }
 

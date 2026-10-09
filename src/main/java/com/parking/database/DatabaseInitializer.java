@@ -10,11 +10,24 @@ public class DatabaseInitializer {
         // Prevent creating an instance of this class
     }
 
+    private static void createSingleParkingLotIndex(Statement statement)
+            throws SQLException {
+
+        String sql = """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                one_parking_lot_only
+                ON parking_lot ((1))
+                """;
+
+        statement.execute(sql);
+    }
+
     public static void initialize() {
         try (Connection connection = DatabaseConnection.connect();
              Statement statement = connection.createStatement()) {
 
             createParkingLotTable(statement);
+            createSingleParkingLotIndex(statement);
             createEntrancesTable(statement);
             createExitsTable(statement);
             createParkingRecordsTable(statement);

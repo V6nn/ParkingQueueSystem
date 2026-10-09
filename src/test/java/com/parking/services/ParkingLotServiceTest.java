@@ -109,22 +109,16 @@ public class ParkingLotServiceTest {
 
     @Test
     public void findAllReturnsSavedParkingLots() throws SQLException {
-        ParkingLot first = new ParkingLot(
+        ParkingLot parkingLot = new ParkingLot(
                 0, "Test Lot A", 100, "06:00", "22:00");
 
-        ParkingLot second = new ParkingLot(
-                0, "Test Lot B", 200, "07:00", "23:00");
-
-        firstParkingLotId = service.save(first);
-        secondParkingLotId = service.save(second);
+        firstParkingLotId = service.save(parkingLot);
 
         List<ParkingLot> parkingLots = service.findAll();
 
-        assertTrue(parkingLots.stream().anyMatch(
-                lot -> lot.getId() == firstParkingLotId));
-
-        assertTrue(parkingLots.stream().anyMatch(
-                lot -> lot.getId() == secondParkingLotId));
+        assertEquals(1, parkingLots.size());
+        assertEquals(firstParkingLotId, parkingLots.get(0).getId());
+        assertEquals("Test Lot A", parkingLots.get(0).getName());
     }
 
     @Test
@@ -221,6 +215,24 @@ public class ParkingLotServiceTest {
             fail("Expected zero ID to be rejected.");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("ID"));
+        }
+    }
+
+    @Test
+    public void rejectSecondParkingLot() throws SQLException {
+        ParkingLot first = new ParkingLot(
+                0, "First Parking Lot", 100, "06:00", "22:00");
+
+        firstParkingLotId = service.save(first);
+
+        ParkingLot second = new ParkingLot(
+                0, "Second Parking Lot", 200, "07:00", "23:00");
+
+        try {
+            service.save(second);
+            fail("Expected a second parking lot to be rejected.");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().contains("Only one"));
         }
     }
 }
