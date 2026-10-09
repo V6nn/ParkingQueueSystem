@@ -213,4 +213,14 @@ public class ParkingLotServiceTest {
             assertTrue(expected.getMessage().contains("spaces"));
         }
     }
+
+    @Test
+    public void rejectInvalidParkingLotId() throws SQLException {
+        try {
+            service.findById(0);
+            fail("Expected zero ID to be rejected.");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("ID"));
+        }
+    }
 }

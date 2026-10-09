@@ -95,6 +95,11 @@ public class ParkingLotService {
     }
 
     public Optional<ParkingLot> findById(int id) throws SQLException {
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Parking lot ID must be greater than zero.");
+        }
+
         String sql = "SELECT * FROM parking_lot WHERE id = ?";
 
         try (Connection connection = DatabaseConnection.connect();
