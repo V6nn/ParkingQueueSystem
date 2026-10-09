@@ -244,7 +244,7 @@ Known behavior:
 - Entrance/exit service validation checks lane counts, active-lane limits, and status.
 - Do not assume that the database alone enforces every business rule; inspect the initializer and service classes.
 
-**Design note to resolve later:** the `parking_lot` table may allow multiple rows even though the current application is described as managing one parking lot. Decide with the team whether to enforce a single-lot rule in the application or revise the schema in a coordinated change.
+**Single-parking-lot rule:** The application manages one parking lot. `ParkingLotService.save()` rejects saving a second parking lot, and `DatabaseInitializer` creates the unique index `one_parking_lot_only` to enforce this rule at the database level. Use `ParkingLotService.update()` to change the existing parking lot's configuration rather than creating another lot.
 
 ## 7. Existing model classes
 
@@ -271,6 +271,21 @@ Person 1 has created these services under `com.parking.services`:
 | `ParkingRecordService` | Save using total capacity, find all, find latest |
 | `EntranceRecordService` | Save, find all, find by entrance ID, find latest by entrance ID |
 | `ExitRecordService` | Save, find all, find by exit ID, find latest by exit ID |
+
+### Verified service behavior
+
+* `ParkingLotService.save(ParkingLot)` returns the generated ID and rejects a second parking lot.
+* `ParkingLotService.update(ParkingLot)` returns whether an existing record was updated.
+* `ParkingLotService.findById(int)` returns `Optional<ParkingLot>`.
+* `ParkingLotService.findAll()` returns the list of parking lots; under the single-lot rule, it should contain at most one record.
+* `ParkingRecordService.save(ParkingRecord, int totalSpaces)` validates occupancy and available-space consistency before saving.
+* `ParkingRecordService.findLatest()` returns the latest saved record or `null` if no record exists.
+* `EntranceRecordService.findLatestByEntranceId(int)` and `ExitRecordService.findLatestByExitId(int)` return `Optional` results.
+* Entrance and exit history lookup methods return lists ordered newest first.
+* Record timestamps use `yyyy-MM-dd HH:mm:ss`.
+* `EntranceRecord.averageServiceTime` is stored as a numeric value. The team must use **seconds per vehicle** consistently and convert units explicitly when calculating rates or waiting times.
+
+Check the current Java source for exact signatures and exceptions before calling a method. The database and service layer are the shared persistence interface for Person 2 and Person 3; their modules should not create duplicate database access code.
 
 Important interface notes:
 - `ParkingLotService.save(ParkingLot)` returns an `int`.
@@ -462,7 +477,7 @@ Keep this section updated as the team makes decisions.
 
 - [ ] Confirm all six service classes and the removal of the temporary service test runner are committed and pushed.
 - [ ] Confirm the current exact model constructors and service method signatures from source.
-- [ ] Agree whether the app enforces one parking lot or supports multiple lots.
+- [x] Enforce one parking lot through ParkingLotService and a SQLite unique index.
 - [ ] Agree on timestamp formats and rate/time units.
 - [ ] Person 2 documents the queueing model, assumptions, inputs, and outputs.
 - [ ] Person 3 documents the optimization inputs, constraints, and outputs.
