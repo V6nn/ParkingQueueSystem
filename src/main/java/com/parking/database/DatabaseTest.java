@@ -31,6 +31,18 @@ public class DatabaseTest {
                 }
             }
 
+            try (ResultSet resultSet =
+                    statement.executeQuery("PRAGMA foreign_keys")) {
+
+                if (resultSet.next()) {
+                    int enabled = resultSet.getInt(1);
+
+                    System.out.println();
+                    System.out.println("Foreign key enforcement: "
+                            + (enabled == 1 ? "ENABLED" : "DISABLED"));
+                }
+            }
+
         } catch (SQLException e) {
             System.err.println("Database test failed.");
             e.printStackTrace();
