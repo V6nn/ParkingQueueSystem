@@ -176,4 +176,32 @@ public class EntranceRecordServiceTest {
                     "Average service time"));
         }
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectInvalidTimestampFormat() throws SQLException {
+        EntranceRecord record = new EntranceRecord(
+                0, entranceId, "10/01/2026 10:00 AM",
+                2, 5, 1.0);
+
+        service.save(record);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectImpossibleTimestampDate() throws SQLException {
+        EntranceRecord record = new EntranceRecord(
+                0, entranceId, "2026-02-30 10:00:00",
+                2, 5, 1.0);
+
+        service.save(record);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindByInvalidEntranceId() throws SQLException {
+        service.findByEntranceId(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindLatestByInvalidEntranceId() throws SQLException {
+        service.findLatestByEntranceId(0);
+    }
 }

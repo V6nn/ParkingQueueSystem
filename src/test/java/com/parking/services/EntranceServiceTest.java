@@ -102,4 +102,22 @@ public class EntranceServiceTest {
     public void rejectInvalidStatus() throws SQLException {
         service.save(new Entrance(0, "Invalid Entrance C", 2, 1, "BUSY"));
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectUpdateWithInvalidId() throws SQLException {
+        Entrance entrance =
+                new Entrance(0, "Invalid ID Entrance", 2, 1, "OPEN");
+
+        service.update(entrance);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindByInvalidId() throws SQLException {
+        service.findById(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectDeleteWithInvalidId() throws SQLException {
+        service.delete(0);
+    }
 }

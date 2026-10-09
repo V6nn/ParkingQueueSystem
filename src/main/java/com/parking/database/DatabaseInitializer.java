@@ -26,8 +26,8 @@ public class DatabaseInitializer {
             System.out.println("Database initialized successfully.");
 
         } catch (SQLException e) {
-            System.err.println("Database initialization failed.");
-            e.printStackTrace();
+            throw new IllegalStateException(
+                    "Database initialization failed.", e);
         }
     }
 

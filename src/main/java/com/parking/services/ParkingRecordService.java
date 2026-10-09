@@ -104,11 +104,7 @@ public class ParkingRecordService {
                     "Total spaces must be greater than zero.");
         }
 
-        if (record.getRecordedAt() == null
-                || record.getRecordedAt().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Record timestamp is required.");
-        }
+        TimestampValidator.validate(record.getRecordedAt());
 
         if (record.getOccupiedSpaces() < 0
                 || record.getOccupiedSpaces() > totalSpaces) {

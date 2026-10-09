@@ -117,4 +117,20 @@ public class ParkingRecordServiceTest {
             assertTrue(expected.getMessage().contains("Total spaces"));
         }
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectInvalidTimestampFormat() throws SQLException {
+        ParkingRecord record = new ParkingRecord(
+                0, "10/01/2026 10:00 AM", 60, 40);
+
+        service.save(record, 100);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectImpossibleTimestampDate() throws SQLException {
+        ParkingRecord record = new ParkingRecord(
+                0, "2026-02-30 10:00:00", 60, 40);
+
+        service.save(record, 100);
+    }
 }

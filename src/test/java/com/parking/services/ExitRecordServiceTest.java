@@ -168,4 +168,30 @@ public class ExitRecordServiceTest {
                     "timestamp"));
         }
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectInvalidTimestampFormat() throws SQLException {
+        ExitRecord record = new ExitRecord(
+                0, exitId, "10/01/2026 10:00 AM", 5);
+
+        service.save(record);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectImpossibleTimestampDate() throws SQLException {
+        ExitRecord record = new ExitRecord(
+                0, exitId, "2026-02-30 10:00:00", 5);
+
+        service.save(record);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindByInvalidExitId() throws SQLException {
+        service.findByExitId(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindLatestByInvalidExitId() throws SQLException {
+        service.findLatestByExitId(0);
+    }
 }

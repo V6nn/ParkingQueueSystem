@@ -70,6 +70,11 @@ public class ExitRecordService {
     public List<ExitRecord> findByExitId(int exitId)
             throws SQLException {
 
+        if (exitId <= 0) {
+            throw new IllegalArgumentException(
+                    "Exit ID must be greater than zero.");
+        }
+
         String sql = """
                 SELECT *
                 FROM exit_records
@@ -97,6 +102,11 @@ public class ExitRecordService {
 
     public Optional<ExitRecord> findLatestByExitId(int exitId)
             throws SQLException {
+
+        if (exitId <= 0) {
+            throw new IllegalArgumentException(
+                    "Exit ID must be greater than zero.");
+        }
 
         String sql = """
                 SELECT *
@@ -133,11 +143,7 @@ public class ExitRecordService {
                     "A valid exit ID is required.");
         }
 
-        if (record.getRecordedAt() == null
-                || record.getRecordedAt().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Record timestamp is required.");
-        }
+        TimestampValidator.validate(record.getRecordedAt());
 
         if (record.getVehiclesExited() < 0) {
             throw new IllegalArgumentException(

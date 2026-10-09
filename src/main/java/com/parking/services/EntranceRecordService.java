@@ -73,6 +73,11 @@ public class EntranceRecordService {
     public List<EntranceRecord> findByEntranceId(int entranceId)
             throws SQLException {
 
+        if (entranceId <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
+
         String sql = """
                 SELECT *
                 FROM entrance_records
@@ -100,6 +105,11 @@ public class EntranceRecordService {
 
     public Optional<EntranceRecord> findLatestByEntranceId(
             int entranceId) throws SQLException {
+
+        if (entranceId <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
 
         String sql = """
                 SELECT *
@@ -136,11 +146,7 @@ public class EntranceRecordService {
                     "A valid entrance ID is required.");
         }
 
-        if (record.getRecordedAt() == null
-                || record.getRecordedAt().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Record timestamp is required.");
-        }
+        TimestampValidator.validate(record.getRecordedAt());
 
         if (record.getQueueLength() < 0) {
             throw new IllegalArgumentException(

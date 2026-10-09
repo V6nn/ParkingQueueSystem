@@ -49,6 +49,11 @@ public class ExitService {
     public boolean update(Exit exit) throws SQLException {
         validate(exit);
 
+        if (exit.getId() <= 0) {
+            throw new IllegalArgumentException(
+                    "Exit ID must be greater than zero.");
+        }
+
         String sql = """
                 UPDATE exits
                 SET name = ?,
@@ -73,6 +78,12 @@ public class ExitService {
     }
 
     public Optional<Exit> findById(int id) throws SQLException {
+
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Exit ID must be greater than zero.");
+        }
+
         String sql = "SELECT * FROM exits WHERE id = ?";
 
         try (Connection connection = DatabaseConnection.connect();
@@ -109,6 +120,12 @@ public class ExitService {
     }
 
     public boolean delete(int id) throws SQLException {
+
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Exit ID must be greater than zero.");
+        }
+
         String sql = "DELETE FROM exits WHERE id = ?";
 
         try (Connection connection = DatabaseConnection.connect();

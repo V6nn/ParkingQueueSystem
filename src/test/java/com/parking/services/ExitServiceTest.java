@@ -98,4 +98,21 @@ public class ExitServiceTest {
     public void rejectInvalidStatus() throws SQLException {
         service.save(new Exit(0, "Invalid Exit C", 2, 1, "BUSY"));
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectUpdateWithInvalidId() throws SQLException {
+        Exit exit = new Exit(0, "Invalid ID Exit", 2, 1, "OPEN");
+
+        service.update(exit);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectFindByInvalidId() throws SQLException {
+        service.findById(0);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectDeleteWithInvalidId() throws SQLException {
+        service.delete(0);
+    }
 }

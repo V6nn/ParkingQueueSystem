@@ -49,6 +49,11 @@ public class EntranceService {
     public boolean update(Entrance entrance) throws SQLException {
         validate(entrance);
 
+        if (entrance.getId() <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
+
         String sql = """
                 UPDATE entrances
                 SET name = ?,
@@ -73,6 +78,12 @@ public class EntranceService {
     }
 
     public Optional<Entrance> findById(int id) throws SQLException {
+
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
+
         String sql = "SELECT * FROM entrances WHERE id = ?";
 
         try (Connection connection = DatabaseConnection.connect();
@@ -109,6 +120,12 @@ public class EntranceService {
     }
 
     public boolean delete(int id) throws SQLException {
+
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
+
         String sql = "DELETE FROM entrances WHERE id = ?";
 
         try (Connection connection = DatabaseConnection.connect();
