@@ -1,0 +1,202 @@
+
+package com.parking.optimization;
+
+import com.parking.models.Entrance;
+import com.parking.models.EntranceRecord;
+import com.parking.models.ParkingRecord;
+import com.parking.services.EntranceRecordService;
+import com.parking.services.EntranceService;
+import com.parking.services.ParkingRecordService;
+
+import java.sql.SQLException;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+
+/**
+ * Connects parking data services to the optimization calculators.
+ */
+public class OptimizationService {
+
+    private final EntranceService entranceService;
+    private final EntranceRecordService entranceRecordService;
+    private final ParkingRecordService parkingRecordService;
+
+    public OptimizationService() {
+        this(
+                new EntranceService(),
+                new EntranceRecordService(),
+                new ParkingRecordService()
+        );
+    }
+
+    public OptimizationService(
+            EntranceService entranceService,
+            EntranceRecordService entranceRecordService,
+            ParkingRecordService parkingRecordService) {
+
+        if (entranceService == null
+                || entranceRecordService == null
+                || parkingRecordService == null) {
+            throw new IllegalArgumentException(
+                    "Services cannot be null.");
+        }
+
+        this.entranceService = entranceService;
+        this.entranceRecordService = entranceRecordService;
+        this.parkingRecordService = parkingRecordService;
+    }
+
+    /**
+     * Generates recommendations using the latest saved records.
+     *
+     * Returns Optional.empty() if the entrance does not exist.
+     */
+    public Optional<OptimizationRecommendation> generateRecommendation(
+            int entranceId,
+            int proposedCapacity,
+            int targetQueuePerLane) throws SQLException {
+
+        if (entranceId <= 0) {
+            throw new IllegalArgumentException(
+                    "Entrance ID must be greater than zero.");
+        }
+
+        if (proposedCapacity < 0) {
+            throw new IllegalArgumentException(
+                    "Proposed capacity cannot be negative.");
+        }
+
+        Optional<Entrance> entranceResult =
+                entranceService.findById(entranceId);
+
+        if (entranceResult.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Entrance entrance = entranceResult.get();
+
+        Optional<EntranceRecord> recordResult =
+                entranceRecordService.findLatestByEntranceId(entranceId);
+
+        EntranceRecord record = recordResult.orElse(null);
+
+        ParkingRecord parkingRecord =
+                parkingRecordService.findLatest();
+
+        Integer queueLength = record == null
+                ? null
+                : record.getQueueLength();
+
+        OptionalInt recommendedLanes =
+                ParkingRecommendationCalculator.recommendLanes(
+                        entrance.getStatus(),
+                        entrance.getLaneCount(),
+                        entrance.getActiveLanes(),
+                        queueLength,
+                        targetQueuePerLane
+                );
+
+        OptionalDouble estimatedWait = OptionalDouble.empty();
+
+        if (record != null && recommendedLanes.isPresent()) {
+            estimatedWait =
+                    ParkingRecommendationCalculator.estimateWaitMinutes(
+                            queueLength,
+                            recommendedLanes.getAsInt(),
+                            record.getAverageServiceTime()
+                    );
+        }
+
+        OptionalInt recommendedCapacity = OptionalInt.empty();
+
+        if (parkingRecord != null) {
+            recommendedCapacity = OptionalInt.of(
+                    ParkingRecommendationCalculator.recommendEntryCapacity(
+                            proposedCapacity,
+                            parkingRecord.getAvailableSpaces()
+                    )
+            );
+        }
+
+        return Optional.of(new OptimizationRecommendation(
+                entrance.getId(),
+                entrance.getName(),
+                queueLength,
+                record == null ? null : record.getRecordedAt(),
+                recommendedLanes,
+                estimatedWait,
+                recommendedCapacity,
+                parkingRecord == null
+                        ? null
+                        : parkingRecord.getRecordedAt()
+        ));
+    }
+
+    /**
+     * Holds the result of one optimization calculation.
+     */
+    public static final class OptimizationRecommendation {
+
+        private final int entranceId;
+        private final String entranceName;
+        private final Integer observedQueueLength;
+        private final String queueRecordedAt;
+        private final OptionalInt recommendedLanes;
+        private final OptionalDouble estimatedWaitMinutes;
+        private final OptionalInt recommendedCapacity;
+        private final String parkingRecordedAt;
+
+        private OptimizationRecommendation(
+                int entranceId,
+                String entranceName,
+                Integer observedQueueLength,
+                String queueRecordedAt,
+                OptionalInt recommendedLanes,
+                OptionalDouble estimatedWaitMinutes,
+                OptionalInt recommendedCapacity,
+                String parkingRecordedAt) {
+
+            this.entranceId = entranceId;
+            this.entranceName = entranceName;
+            this.observedQueueLength = observedQueueLength;
+            this.queueRecordedAt = queueRecordedAt;
+            this.recommendedLanes = recommendedLanes;
+            this.estimatedWaitMinutes = estimatedWaitMinutes;
+            this.recommendedCapacity = recommendedCapacity;
+            this.parkingRecordedAt = parkingRecordedAt;
+        }
+
+        public int getEntranceId() {
+            return entranceId;
+        }
+
+        public String getEntranceName() {
+            return entranceName;
+        }
+
+        public Integer getObservedQueueLength() {
+            return observedQueueLength;
+        }
+
+        public String getQueueRecordedAt() {
+            return queueRecordedAt;
+        }
+
+        public OptionalInt getRecommendedLanes() {
+            return recommendedLanes;
+        }
+
+        public OptionalDouble getEstimatedWaitMinutes() {
+            return estimatedWaitMinutes;
+        }
+
+        public OptionalInt getRecommendedCapacity() {
+            return recommendedCapacity;
+        }
+
+        public String getParkingRecordedAt() {
+            return parkingRecordedAt;
+        }
+    }
+}
