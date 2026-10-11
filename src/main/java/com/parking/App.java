@@ -1,5 +1,4 @@
-
-package com.parking;
+﻿package com.parking;
 
 import com.parking.database.DatabaseInitializer;
 import com.parking.ui.ParkingDashboard;
