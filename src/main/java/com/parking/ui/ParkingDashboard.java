@@ -87,12 +87,25 @@ public class ParkingDashboard extends JFrame {
         centerPanel.add(tablePanel, BorderLayout.CENTER);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
 
-        JButton refreshButton = new JButton("Refresh Data");
-        refreshButton.addActionListener(event -> refreshDashboard());
 
-        JPanel footer = new JPanel(new BorderLayout(10, 0));
-        footer.add(statusLabel, BorderLayout.CENTER);
-        footer.add(refreshButton, BorderLayout.EAST);
+	JButton refreshButton = new JButton("Refresh Data");
+    refreshButton.addActionListener(event -> refreshDashboard());
+
+    JButton manualEntryButton = new JButton("Manual Data Entry");
+    manualEntryButton.addActionListener(event -> {
+        ManualDataEntryFrame manualEntry = new ManualDataEntryFrame();
+        manualEntry.setVisible(true);
+    });
+
+    JPanel buttonPanel = new JPanel(
+            new FlowLayout(FlowLayout.RIGHT, 8, 0));
+    buttonPanel.add(manualEntryButton);
+    buttonPanel.add(refreshButton);
+
+    JPanel footer = new JPanel(new BorderLayout(10, 0));
+    footer.add(statusLabel, BorderLayout.CENTER);
+    footer.add(buttonPanel, BorderLayout.EAST);
+
 
         mainPanel.add(footer, BorderLayout.SOUTH);
         setContentPane(mainPanel);
