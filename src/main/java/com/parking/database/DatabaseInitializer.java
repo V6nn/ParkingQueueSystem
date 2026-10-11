@@ -22,12 +22,28 @@ public class DatabaseInitializer {
         statement.execute(sql);
     }
 
+    private static void createAdminsTable(Statement statement)
+            throws SQLException {
+
+        String sql = """
+                CREATE TABLE IF NOT EXISTS admins (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """;
+
+        statement.execute(sql);
+    }
+
     public static void initialize() {
         try (Connection connection = DatabaseConnection.connect();
              Statement statement = connection.createStatement()) {
 
             createParkingLotTable(statement);
             createSingleParkingLotIndex(statement);
+            createAdminsTable(statement);
             createEntrancesTable(statement);
             createExitsTable(statement);
             createParkingRecordsTable(statement);

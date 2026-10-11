@@ -777,7 +777,7 @@ public class ManualDataEntryFrame extends JFrame {
                     Double.parseDouble(averageServiceTimeField.getText().trim())
             );
 
-            entranceRecordService.save(record);
+            entranceRecordService.saveAndUpdateOccupancy(record);
 
             observationStatusLabel.setText("Entrance observation saved.");
             JOptionPane.showMessageDialog(
@@ -786,7 +786,7 @@ public class ManualDataEntryFrame extends JFrame {
         } catch (NumberFormatException exception) {
             showError("Queue length and vehicles entered must be whole numbers. "
                     + "Service time must be a number.");
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | IllegalStateException exception) {
             showError(exception.getMessage());
         } catch (SQLException exception) {
             showError("Could not save entrance record: "
@@ -803,25 +803,42 @@ public class ManualDataEntryFrame extends JFrame {
                 return;
             }
 
+            List<ParkingLot> parkingLots = parkingLotService.findAll();
+
+            if (parkingLots.isEmpty()) {
+                showError("Configure the parking lot first.");
+                return;
+            }
+
+            int totalSpaces = parkingLots.get(0).getTotalSpaces();
+
+            int vehiclesExited = Integer.parseInt(
+                    vehiclesExitedField.getText().trim());
+
             ExitRecord record = new ExitRecord(
                     0,
                     exit.getId(),
                     currentTimestamp(),
-                    Integer.parseInt(vehiclesExitedField.getText().trim())
+                    vehiclesExited
             );
 
-            exitRecordService.save(record);
+            exitRecordService.saveAndUpdateOccupancy(
+                    record, totalSpaces);
 
-            observationStatusLabel.setText("Exit observation saved.");
+            observationStatusLabel.setText(
+                    "Exit saved. Vehicles exited: " + vehiclesExited);
+
             JOptionPane.showMessageDialog(
-                    this, "Exit record saved successfully.");
+                    this,
+                    "Exit record saved and parking occupancy updated.");
 
         } catch (NumberFormatException exception) {
             showError("Vehicles exited must be a whole number.");
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException | IllegalStateException exception) {
             showError(exception.getMessage());
         } catch (SQLException exception) {
-            showError("Could not save exit record: " + exception.getMessage());
+            showError("Could not save exit record: "
+                    + exception.getMessage());
         }
     }
 }

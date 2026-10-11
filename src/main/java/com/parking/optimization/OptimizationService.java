@@ -1,4 +1,3 @@
-
 package com.parking.optimization;
 
 import com.parking.models.Entrance;
@@ -7,8 +6,11 @@ import com.parking.models.ParkingRecord;
 import com.parking.services.EntranceRecordService;
 import com.parking.services.EntranceService;
 import com.parking.services.ParkingRecordService;
+import com.parking.models.ParkingLot;
+import com.parking.services.ParkingLotService;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -21,31 +23,49 @@ public class OptimizationService {
     private final EntranceService entranceService;
     private final EntranceRecordService entranceRecordService;
     private final ParkingRecordService parkingRecordService;
+    private final ParkingLotService parkingLotService;
 
-    public OptimizationService() {
-        this(
-                new EntranceService(),
-                new EntranceRecordService(),
-                new ParkingRecordService()
-        );
+public OptimizationService() {
+    this(
+            new EntranceService(),
+            new EntranceRecordService(),
+            new ParkingRecordService(),
+            new ParkingLotService()
+    );
+}
+
+public OptimizationService(
+        EntranceService entranceService,
+        EntranceRecordService entranceRecordService,
+        ParkingRecordService parkingRecordService) {
+
+    this(
+            entranceService,
+            entranceRecordService,
+            parkingRecordService,
+            new ParkingLotService()
+    );
+}
+
+public OptimizationService(
+        EntranceService entranceService,
+        EntranceRecordService entranceRecordService,
+        ParkingRecordService parkingRecordService,
+        ParkingLotService parkingLotService) {
+
+    if (entranceService == null
+            || entranceRecordService == null
+            || parkingRecordService == null
+            || parkingLotService == null) {
+        throw new IllegalArgumentException(
+                "Services cannot be null.");
     }
 
-    public OptimizationService(
-            EntranceService entranceService,
-            EntranceRecordService entranceRecordService,
-            ParkingRecordService parkingRecordService) {
-
-        if (entranceService == null
-                || entranceRecordService == null
-                || parkingRecordService == null) {
-            throw new IllegalArgumentException(
-                    "Services cannot be null.");
-        }
-
-        this.entranceService = entranceService;
-        this.entranceRecordService = entranceRecordService;
-        this.parkingRecordService = parkingRecordService;
-    }
+    this.entranceService = entranceService;
+    this.entranceRecordService = entranceRecordService;
+    this.parkingRecordService = parkingRecordService;
+    this.parkingLotService = parkingLotService;
+}
 
     /**
      * Generates recommendations using the latest saved records.
@@ -111,12 +131,31 @@ public class OptimizationService {
         OptionalInt recommendedCapacity = OptionalInt.empty();
 
         if (parkingRecord != null) {
-            recommendedCapacity = OptionalInt.of(
-                    ParkingRecommendationCalculator.recommendEntryCapacity(
-                            proposedCapacity,
-                            parkingRecord.getAvailableSpaces()
-                    )
-            );
+            List<ParkingLot> parkingLots =
+                    parkingLotService.findAll();
+
+            if (!parkingLots.isEmpty()) {
+                int totalSpaces =
+                        parkingLots.get(0).getTotalSpaces();
+
+                int occupiedSpaces =
+                        parkingRecord.getOccupiedSpaces();
+
+                // Do not recommend entry capacity when the
+                // saved occupancy exceeds the configured capacity.
+                if (occupiedSpaces >= 0
+                        && occupiedSpaces <= totalSpaces) {
+
+                    int availableSpaces =
+                            totalSpaces - occupiedSpaces;
+
+                    recommendedCapacity = OptionalInt.of(
+                            ParkingRecommendationCalculator
+                                    .recommendEntryCapacity(
+                                            proposedCapacity,
+                                            availableSpaces));
+                }
+            }
         }
 
         return Optional.of(new OptimizationRecommendation(
