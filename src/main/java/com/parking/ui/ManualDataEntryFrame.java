@@ -6,6 +6,8 @@ import com.parking.models.ParkingRecord;
 import com.parking.services.EntranceRecordService;
 import com.parking.services.ExitRecordService;
 import com.parking.services.ParkingRecordService;
+import com.parking.models.VehicleTransaction;
+import com.parking.services.VehicleTransactionService;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,6 +26,17 @@ import java.sql.SQLException;
 import java.util.List;
 
 public class ManualDataEntryFrame extends JFrame {
+
+    private final Runnable onDataChanged;
+
+    private final VehicleTransactionService vehicleTransactionService =
+            new VehicleTransactionService();
+
+    private JTextField vehicleEntryPlateField;
+    private JComboBox<String> vehicleEntryTypeBox;
+
+    private JTextField vehicleExitPlateField;
+    private JComboBox<String> vehicleExitTypeBox;
 
     private final ParkingRecordService parkingRecordService =
         new ParkingRecordService();
@@ -73,6 +86,7 @@ public class ManualDataEntryFrame extends JFrame {
     private JTextField queueLengthField;
     private JTextField vehiclesEnteredField;
     private JTextField averageServiceTimeField;
+    private JTextField observationDurationMinutesField;
 
     private JComboBox<Exit> observationExitBox;
     private JTextField vehiclesExitedField;
@@ -97,7 +111,18 @@ public class ManualDataEntryFrame extends JFrame {
     }
 
     public ManualDataEntryFrame() {
-        setTitle("Parking Queue System - Manual Data Entry");
+        this(() -> { });
+    }
+
+    public ManualDataEntryFrame(Runnable onDataChanged) {
+        if (onDataChanged == null) {
+            throw new IllegalArgumentException(
+                    "Data change callback cannot be null.");
+        }
+        this.onDataChanged = onDataChanged;
+
+        ParkflowTheme.install();
+        setTitle("Parkflow - Manual Data Entry");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setSize(1000, 650);
         setMinimumSize(new Dimension(800, 550));
@@ -112,19 +137,34 @@ public class ManualDataEntryFrame extends JFrame {
 
     private void createInterface() {
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBackground(ParkflowTheme.BACKGROUND);
         mainPanel.setBorder(
-                BorderFactory.createEmptyBorder(15, 15, 15, 15));
+                BorderFactory.createEmptyBorder(18, 20, 20, 20));
 
-        JLabel titleLabel = new JLabel(
-                "Parking Queue System - Manual Data Entry");
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 22));
+        JPanel headerPanel = new JPanel(new BorderLayout());
+        headerPanel.setBackground(ParkflowTheme.NAVY);
+        headerPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(
+                        0, 5, 0, 0, ParkflowTheme.GREEN),
+                BorderFactory.createEmptyBorder(12, 16, 12, 16)));
+
+        JPanel brandingPanel = new JPanel(new GridLayout(2, 1, 0, 3));
+        brandingPanel.setOpaque(false);
+        JLabel titleLabel = new JLabel("Parkflow");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 23));
+        titleLabel.setForeground(Color.WHITE);
 
         JLabel subtitleLabel = new JLabel(
-                "Configure the parking lot and record observed data.");
+                "Manage your lot, entrances, exits, and observations.");
+        subtitleLabel.setForeground(new Color(205, 220, 225));
+        brandingPanel.add(titleLabel);
+        brandingPanel.add(subtitleLabel);
+        headerPanel.add(brandingPanel, BorderLayout.WEST);
 
-        JPanel headerPanel = new JPanel(new GridLayout(2, 1, 0, 5));
-        headerPanel.add(titleLabel);
-        headerPanel.add(subtitleLabel);
+        JLabel sectionLabel = new JLabel("MANUAL DATA ENTRY");
+        sectionLabel.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        sectionLabel.setForeground(new Color(176, 205, 210));
+        headerPanel.add(sectionLabel, BorderLayout.EAST);
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Parking Lot", createParkingLotPanel());
@@ -173,9 +213,11 @@ public class ManualDataEntryFrame extends JFrame {
                 "Operating end (HH:mm):", endTimeField);
 
         JButton saveButton = new JButton("Save Configuration");
+        ParkflowTheme.styleButton(saveButton, true);
         saveButton.addActionListener(event -> saveParkingLot());
 
         JButton reloadButton = new JButton("Reload Saved Data");
+        ParkflowTheme.styleButton(reloadButton, false);
         reloadButton.addActionListener(event -> loadParkingLot());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -214,6 +256,7 @@ public class ManualDataEntryFrame extends JFrame {
                 return;
             }
 
+            notifyDataChanged();
             JOptionPane.showMessageDialog(
                     this, "Parking lot configuration saved successfully.");
 
@@ -284,22 +327,31 @@ public class ManualDataEntryFrame extends JFrame {
         addFormRow(form, gbc, 3, "Status:", entranceStatusBox);
 
         JButton saveButton = new JButton("Add Entrance");
+        ParkflowTheme.styleButton(saveButton, true);
         saveButton.addActionListener(event -> saveEntrance());
 
         JButton updateButton = new JButton("Update Selected");
+        ParkflowTheme.styleButton(updateButton, false);
         updateButton.addActionListener(event -> updateEntrance());
 
         JButton clearButton = new JButton("Clear Form");
+        ParkflowTheme.styleButton(clearButton, false);
         clearButton.addActionListener(event -> clearEntranceForm());
 
         JButton refreshButton = new JButton("Refresh List");
+        ParkflowTheme.styleButton(refreshButton, false);
         refreshButton.addActionListener(event -> loadEntrances());
+
+        JButton deleteButton = new JButton("Delete Selected");
+        ParkflowTheme.styleButton(deleteButton, false);
+        deleteButton.addActionListener(event -> deleteEntrance());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttons.add(saveButton);
         buttons.add(updateButton);
         buttons.add(clearButton);
         buttons.add(refreshButton);
+        buttons.add(deleteButton);
 
         JPanel top = new JPanel(new BorderLayout(5, 5));
         top.add(form, BorderLayout.CENTER);
@@ -315,6 +367,7 @@ public class ManualDataEntryFrame extends JFrame {
         };
 
         entranceTable = new JTable(entranceTableModel);
+        ParkflowTheme.styleTable(entranceTable);
         entranceTable.setSelectionMode(
                 ListSelectionModel.SINGLE_SELECTION);
 
@@ -355,6 +408,7 @@ public class ManualDataEntryFrame extends JFrame {
             clearEntranceForm();
             loadEntrances();
             entranceStatusLabel.setText("Entrance added successfully.");
+            notifyDataChanged();
 
         } catch (NumberFormatException exception) {
             showError("Lane counts must be whole numbers.");
@@ -380,6 +434,7 @@ public class ManualDataEntryFrame extends JFrame {
                 clearEntranceForm();
                 entranceStatusLabel.setText(
                         "Entrance updated successfully.");
+                notifyDataChanged();
             } else {
                 showError("Entrance not found. Refresh the list.");
             }
@@ -390,6 +445,39 @@ public class ManualDataEntryFrame extends JFrame {
             showError(exception.getMessage());
         } catch (SQLException exception) {
             showError("Could not update entrance: "
+                    + exception.getMessage());
+        }
+    }
+
+    private void deleteEntrance() {
+        if (selectedEntranceId <= 0) {
+            showError("Select an entrance from the table first.");
+            return;
+        }
+
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Delete the selected entrance? This cannot be undone.",
+                "Confirm Entrance Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            if (entranceService.delete(selectedEntranceId)) {
+                clearEntranceForm();
+                loadEntrances();
+                loadObservationOptions();
+                entranceStatusLabel.setText("Entrance deleted.");
+                notifyDataChanged();
+            } else {
+                showError("Entrance not found. Refresh the list.");
+            }
+        } catch (SQLException exception) {
+            showError("Could not delete entrance. Historical queue "
+                    + "observations or recommendations may refer to it. "
                     + exception.getMessage());
         }
     }
@@ -488,22 +576,31 @@ public class ManualDataEntryFrame extends JFrame {
         addFormRow(form, gbc, 3, "Status:", exitStatusBox);
 
         JButton addButton = new JButton("Add Exit");
+        ParkflowTheme.styleButton(addButton, true);
         addButton.addActionListener(event -> saveExit());
 
         JButton updateButton = new JButton("Update Selected");
+        ParkflowTheme.styleButton(updateButton, false);
         updateButton.addActionListener(event -> updateExit());
 
         JButton clearButton = new JButton("Clear Form");
+        ParkflowTheme.styleButton(clearButton, false);
         clearButton.addActionListener(event -> clearExitForm());
 
         JButton refreshButton = new JButton("Refresh List");
+        ParkflowTheme.styleButton(refreshButton, false);
         refreshButton.addActionListener(event -> loadExits());
+
+        JButton deleteButton = new JButton("Delete Selected");
+        ParkflowTheme.styleButton(deleteButton, false);
+        deleteButton.addActionListener(event -> deleteExit());
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttons.add(addButton);
         buttons.add(updateButton);
         buttons.add(clearButton);
         buttons.add(refreshButton);
+        buttons.add(deleteButton);
 
         JPanel top = new JPanel(new BorderLayout(5, 5));
         top.add(form, BorderLayout.CENTER);
@@ -518,6 +615,7 @@ public class ManualDataEntryFrame extends JFrame {
         };
 
         exitTable = new JTable(exitTableModel);
+        ParkflowTheme.styleTable(exitTable);
         exitTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         exitTable.getSelectionModel().addListSelectionListener(event -> {
@@ -560,6 +658,7 @@ public class ManualDataEntryFrame extends JFrame {
             clearExitForm();
             loadExits();
             exitStatusLabel.setText("Exit added successfully.");
+            notifyDataChanged();
 
         } catch (NumberFormatException exception) {
             showError("Lane counts must be whole numbers.");
@@ -584,6 +683,7 @@ public class ManualDataEntryFrame extends JFrame {
                 loadExits();
                 clearExitForm();
                 exitStatusLabel.setText("Exit updated successfully.");
+                notifyDataChanged();
             } else {
                 showError("Exit not found. Refresh the list.");
             }
@@ -594,6 +694,38 @@ public class ManualDataEntryFrame extends JFrame {
             showError(exception.getMessage());
         } catch (SQLException exception) {
             showError("Could not update exit: " + exception.getMessage());
+        }
+    }
+
+    private void deleteExit() {
+        if (selectedExitId <= 0) {
+            showError("Select an exit from the table first.");
+            return;
+        }
+
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Delete the selected exit? This cannot be undone.",
+                "Confirm Exit Deletion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            if (exitService.delete(selectedExitId)) {
+                clearExitForm();
+                loadExits();
+                loadObservationOptions();
+                exitStatusLabel.setText("Exit deleted.");
+                notifyDataChanged();
+            } else {
+                showError("Exit not found. Refresh the list.");
+            }
+        } catch (SQLException exception) {
+            showError("Could not delete exit. Historical exit records may "
+                    + "refer to it. " + exception.getMessage());
         }
     }
 
@@ -632,11 +764,20 @@ public class ManualDataEntryFrame extends JFrame {
         panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
         JTabbedPane observationTabs = new JTabbedPane();
-        observationTabs.addTab("Parking Occupancy", createOccupancyPanel());
-        observationTabs.addTab("Entrance Record", createEntranceObservationPanel());
-        observationTabs.addTab("Exit Record", createExitObservationPanel());
 
-        observationStatusLabel = new JLabel("Ready to record observations.");
+        observationTabs.addTab(
+                "Parking Occupancy", createOccupancyPanel());
+        observationTabs.addTab(
+                "Entrance Record", createEntranceObservationPanel());
+        observationTabs.addTab(
+                "Exit Record", createExitObservationPanel());
+        observationTabs.addTab(
+                "Vehicle Entry", createVehicleEntryPanel());
+        observationTabs.addTab(
+                "Vehicle Exit", createVehicleExitPanel());
+
+        observationStatusLabel =
+                new JLabel("Ready to record observations.");
 
         panel.add(observationTabs, BorderLayout.CENTER);
         panel.add(observationStatusLabel, BorderLayout.SOUTH);
@@ -644,6 +785,192 @@ public class ManualDataEntryFrame extends JFrame {
         return panel;
     }
 
+        private JPanel createVehicleEntryPanel() {
+            JPanel panel = new JPanel(new GridBagLayout());
+            GridBagConstraints gbc = new GridBagConstraints();
+
+            gbc.insets = new Insets(8, 8, 8, 8);
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+
+            vehicleEntryPlateField = new JTextField(20);
+            vehicleEntryTypeBox = new JComboBox<>(
+                    new String[]{"Car", "Motorcycle"});
+
+            addFormRow(panel, gbc, 0,
+                    "Plate number:", vehicleEntryPlateField);
+            addFormRow(panel, gbc, 1,
+                    "Vehicle type:", vehicleEntryTypeBox);
+
+            JButton entryButton = new JButton("Record Vehicle Entry");
+            ParkflowTheme.styleButton(entryButton, true);
+            entryButton.addActionListener(event -> saveVehicleEntry());
+
+            gbc.gridx = 1;
+            gbc.gridy = 2;
+            panel.add(entryButton, gbc);
+
+            return panel;
+        }
+
+        private void saveVehicleEntry() {
+            String plate = vehicleEntryPlateField.getText().trim();
+
+            if (plate.isEmpty()) {
+                showError("Enter the vehicle's plate number.");
+                return;
+            }
+
+            String selectedType =
+                    (String) vehicleEntryTypeBox.getSelectedItem();
+
+            String vehicleType = "Car".equals(selectedType)
+                    ? "CAR" : "MOTORCYCLE";
+
+            try {
+                VehicleTransaction transaction =
+                        vehicleTransactionService.recordVehicleEntry(
+                                plate, vehicleType);
+                notifyDataChanged();
+
+                observationStatusLabel.setText(
+                        "Vehicle entry recorded: " + transaction.getPlateNumber());
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Vehicle entry recorded successfully."
+                        + "\nPlate: " + transaction.getPlateNumber()
+                        + "\nVehicle type: " + transaction.getVehicleType()
+                        + "\nParking status: " + transaction.getParkingStatus(),
+                        "Vehicle Entry",
+                        JOptionPane.INFORMATION_MESSAGE);
+
+                vehicleEntryPlateField.setText("");
+
+            } catch (SQLException | IllegalArgumentException
+                    | IllegalStateException exception) {
+                showError("Could not record vehicle entry: "
+                        + exception.getMessage());
+            }
+        }
+
+    private JPanel createVehicleExitPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+
+        gbc.insets = new Insets(8, 8, 8, 8);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        vehicleExitPlateField = new JTextField(20);
+        vehicleExitTypeBox = new JComboBox<>(
+                new String[]{"Car", "Motorcycle"});
+
+        addFormRow(panel, gbc, 0,
+                "Plate number:", vehicleExitPlateField);
+        addFormRow(panel, gbc, 1,
+                "Vehicle type:", vehicleExitTypeBox);
+
+        JButton exitButton = new JButton("Process Exit Payment");
+        ParkflowTheme.styleButton(exitButton, true);
+        exitButton.addActionListener(event -> saveVehicleExit());
+
+        gbc.gridx = 1;
+        gbc.gridy = 2;
+        panel.add(exitButton, gbc);
+
+        JLabel notice = new JLabel(
+                "Demo only: payment is simulated when the vehicle exits.");
+
+        gbc.gridy = 3;
+        panel.add(notice, gbc);
+
+        return panel;
+    }
+
+    private void saveVehicleExit() {
+        String plate = vehicleExitPlateField.getText().trim();
+
+        if (plate.isEmpty()) {
+            showError("Enter the vehicle's plate number.");
+            return;
+        }
+
+        String selectedType =
+                (String) vehicleExitTypeBox.getSelectedItem();
+
+        String vehicleType = "Car".equals(selectedType)
+                ? "CAR" : "MOTORCYCLE";
+
+        try {
+            VehicleTransaction activeTransaction = null;
+
+            for (VehicleTransaction transaction
+                    : vehicleTransactionService.findAll()) {
+
+                if (transaction.getPlateNumber().equalsIgnoreCase(plate)
+                        && "OCCUPIED".equals(
+                                transaction.getParkingStatus())) {
+                    activeTransaction = transaction;
+                    break;
+                }
+            }
+
+            if (activeTransaction == null) {
+                showError("No occupied vehicle was found with plate "
+                        + plate.toUpperCase() + ".");
+                return;
+            }
+
+            if (!activeTransaction.getVehicleType().equals(vehicleType)) {
+                showError("The selected vehicle type does not match "
+                        + "the registered vehicle.");
+                return;
+            }
+
+            int choice = JOptionPane.showConfirmDialog(
+                    this,
+                    String.format(
+                            "Process simulated exit payment?%n%n"
+                            + "Plate: %s%n"
+                            + "Vehicle: %s%n"
+                            + "Amount: PHP %.2f",
+                            activeTransaction.getPlateNumber(),
+                            activeTransaction.getVehicleType(),
+                            activeTransaction.getAmount()),
+                    "Confirm Vehicle Exit",
+                    JOptionPane.YES_NO_OPTION);
+
+            if (choice != JOptionPane.YES_OPTION) {
+                return;
+            }
+
+            VehicleTransaction completed =
+                    vehicleTransactionService.payAtExit(plate);
+            notifyDataChanged();
+
+            observationStatusLabel.setText(
+                    "Vehicle exited: " + completed.getPlateNumber());
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    String.format(
+                            "Vehicle exit completed!%n%n"
+                            + "Plate: %s%n"
+                            + "Payment: %s%n"
+                            + "Parking status: %s",
+                            completed.getPlateNumber(),
+                            completed.getPaymentStatus(),
+                            completed.getParkingStatus()),
+                    "Vehicle Exit",
+                    JOptionPane.INFORMATION_MESSAGE);
+
+            vehicleExitPlateField.setText("");
+
+        } catch (SQLException | IllegalArgumentException
+                | IllegalStateException exception) {
+            showError("Could not process vehicle exit: "
+                    + exception.getMessage());
+        }
+    }
     private JPanel createOccupancyPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -657,6 +984,7 @@ public class ManualDataEntryFrame extends JFrame {
         addFormRow(panel, gbc, 1, "Recorded at:", observationTimeField);
 
         JButton saveButton = new JButton("Save Occupancy");
+        ParkflowTheme.styleButton(saveButton, true);
         saveButton.addActionListener(event -> saveOccupancy());
 
         gbc.gridx = 1;
@@ -675,19 +1003,26 @@ public class ManualDataEntryFrame extends JFrame {
         observationEntranceBox = new JComboBox<>();
         queueLengthField = new JTextField("0", 20);
         vehiclesEnteredField = new JTextField("0", 20);
-        averageServiceTimeField = new JTextField("0", 20);
+        averageServiceTimeField = new JTextField("", 20);
+        observationDurationMinutesField = new JTextField("", 20);
 
         addFormRow(panel, gbc, 0, "Entrance:", observationEntranceBox);
         addFormRow(panel, gbc, 1, "Queue length (vehicles):", queueLengthField);
-        addFormRow(panel, gbc, 2, "Vehicles entered:", vehiclesEnteredField);
-        addFormRow(panel, gbc, 3, "Average service time (seconds/vehicle):",
+        addFormRow(panel, gbc, 2,
+                "Vehicles entered during interval:", vehiclesEnteredField);
+        addFormRow(panel, gbc, 3,
+                "Average service time (seconds/vehicle, optional):",
                 averageServiceTimeField);
+        addFormRow(panel, gbc, 4,
+                "Observation duration (minutes, optional for prediction):",
+                observationDurationMinutesField);
 
         JButton saveButton = new JButton("Save Entrance Record");
+        ParkflowTheme.styleButton(saveButton, true);
         saveButton.addActionListener(event -> saveEntranceObservation());
 
         gbc.gridx = 1;
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         panel.add(saveButton, gbc);
 
         return panel;
@@ -706,6 +1041,7 @@ public class ManualDataEntryFrame extends JFrame {
         addFormRow(panel, gbc, 1, "Vehicles exited:", vehiclesExitedField);
 
         JButton saveButton = new JButton("Save Exit Record");
+        ParkflowTheme.styleButton(saveButton, true);
         saveButton.addActionListener(event -> saveExitObservation());
 
         gbc.gridx = 1;
@@ -744,6 +1080,7 @@ public class ManualDataEntryFrame extends JFrame {
 
             parkingRecordService.save(record, totalSpaces);
 
+            notifyDataChanged();
             observationStatusLabel.setText(
                     "Occupancy saved. Available spaces: " + available);
             JOptionPane.showMessageDialog(
@@ -774,11 +1111,20 @@ public class ManualDataEntryFrame extends JFrame {
                     currentTimestamp(),
                     Integer.parseInt(queueLengthField.getText().trim()),
                     Integer.parseInt(vehiclesEnteredField.getText().trim()),
-                    Double.parseDouble(averageServiceTimeField.getText().trim())
+                    averageServiceTimeField.getText().isBlank()
+                            ? null
+                            : Double.parseDouble(
+                                    averageServiceTimeField.getText().trim()),
+                    observationDurationMinutesField.getText().isBlank()
+                            ? null
+                            : Double.parseDouble(
+                                    observationDurationMinutesField
+                                            .getText().trim())
             );
 
             entranceRecordService.saveAndUpdateOccupancy(record);
 
+            notifyDataChanged();
             observationStatusLabel.setText("Entrance observation saved.");
             JOptionPane.showMessageDialog(
                     this, "Entrance record saved successfully.");
@@ -825,6 +1171,7 @@ public class ManualDataEntryFrame extends JFrame {
             exitRecordService.saveAndUpdateOccupancy(
                     record, totalSpaces);
 
+            notifyDataChanged();
             observationStatusLabel.setText(
                     "Exit saved. Vehicles exited: " + vehiclesExited);
 
@@ -840,5 +1187,9 @@ public class ManualDataEntryFrame extends JFrame {
             showError("Could not save exit record: "
                     + exception.getMessage());
         }
+    }
+
+    private void notifyDataChanged() {
+        onDataChanged.run();
     }
 }

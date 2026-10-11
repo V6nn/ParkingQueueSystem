@@ -58,7 +58,7 @@ public class ExitRecordService {
         String latestOccupancySql = """
                 SELECT occupied_spaces
                 FROM parking_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 LIMIT 1
                 """;
 
@@ -149,7 +149,7 @@ public class ExitRecordService {
         String sql = """
                 SELECT *
                 FROM exit_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 """;
 
         List<ExitRecord> records = new ArrayList<>();
@@ -179,7 +179,7 @@ public class ExitRecordService {
                 SELECT *
                 FROM exit_records
                 WHERE exit_id = ?
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 """;
 
         List<ExitRecord> records = new ArrayList<>();
@@ -212,7 +212,7 @@ public class ExitRecordService {
                 SELECT *
                 FROM exit_records
                 WHERE exit_id = ?
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 LIMIT 1
                 """;
 

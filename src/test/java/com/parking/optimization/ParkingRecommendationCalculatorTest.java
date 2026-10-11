@@ -21,6 +21,16 @@ public class ParkingRecommendationCalculatorTest {
     }
 
     @Test
+    public void zeroQueueDoesNotRecommendOpeningLanes() {
+        OptionalInt result =
+                ParkingRecommendationCalculator.recommendLanes(
+                        "OPEN", 4, 2, 0, 4);
+
+        assertTrue(result.isPresent());
+        assertEquals(0, result.getAsInt());
+    }
+
+    @Test
     public void closedEntranceGetsZeroLanes() {
         OptionalInt result =
                 ParkingRecommendationCalculator.recommendLanes(
@@ -74,5 +84,25 @@ public class ParkingRecommendationCalculatorTest {
                 ParkingRecommendationCalculator.recommendEntryCapacity(
                         12, 8));
     }
-}
 
+    @Test
+    public void predictedQueueCanIncludeArrivalsWhenNoLanesAreOpen() {
+        OptionalInt result =
+                ParkingRecommendationCalculator.predictQueueLength(
+                        0, 2.0, 0, 30.0, 5.0);
+
+        assertTrue(result.isPresent());
+        assertEquals(10, result.getAsInt());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsInvalidLaneCount() {
+        ParkingRecommendationCalculator.recommendLanes(
+                "OPEN", 0, 0, 4, 2);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNegativeRecommendedCapacity() {
+        ParkingRecommendationCalculator.recommendEntryCapacity(-1, 5);
+    }
+}

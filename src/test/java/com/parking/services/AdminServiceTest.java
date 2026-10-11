@@ -5,7 +5,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -14,6 +13,10 @@ import static org.junit.Assert.*;
 
 public class AdminServiceTest {
 
+    private static final String SECURITY_QUESTION =
+            "What was the name of your first school?";
+    private static final String SECURITY_ANSWER = "North School";
+
     private AdminService adminService;
     private Path tempDatabase;
     private String previousDatabaseUrl;
@@ -21,16 +24,12 @@ public class AdminServiceTest {
     @Before
     public void setUp() throws Exception {
         previousDatabaseUrl = System.getProperty("parking.db.url");
-
         tempDatabase = Files.createTempFile(
                 "parking-admin-test-", ".db");
-
         System.setProperty(
                 "parking.db.url",
                 "jdbc:sqlite:" + tempDatabase.toAbsolutePath());
-
         DatabaseInitializer.initialize();
-
         adminService = new AdminService();
     }
 
@@ -39,10 +38,8 @@ public class AdminServiceTest {
         if (previousDatabaseUrl == null) {
             System.clearProperty("parking.db.url");
         } else {
-            System.setProperty(
-                    "parking.db.url", previousDatabaseUrl);
+            System.setProperty("parking.db.url", previousDatabaseUrl);
         }
-
         if (tempDatabase != null) {
             Files.deleteIfExists(tempDatabase);
             Files.deleteIfExists(
@@ -59,18 +56,14 @@ public class AdminServiceTest {
 
     @Test
     public void createInitialAdminSuccessfully() throws SQLException {
-        assertTrue(adminService.createInitialAdmin(
-                "admin", "SecurePass123"));
-
+        createInitialAdmin();
         assertTrue(adminService.hasAdminAccount());
     }
 
     @Test
     public void loginSucceedsWithCorrectCredentials()
             throws SQLException {
-        adminService.createInitialAdmin(
-                "admin", "SecurePass123");
-
+        createInitialAdmin();
         assertTrue(adminService.authenticate(
                 "admin", "SecurePass123"));
     }
@@ -78,9 +71,7 @@ public class AdminServiceTest {
     @Test
     public void loginFailsWithIncorrectPassword()
             throws SQLException {
-        adminService.createInitialAdmin(
-                "admin", "SecurePass123");
-
+        createInitialAdmin();
         assertFalse(adminService.authenticate(
                 "admin", "WrongPassword123"));
     }
@@ -94,12 +85,11 @@ public class AdminServiceTest {
 
     @Test
     public void secondInitialAdminIsRejected() throws SQLException {
-        adminService.createInitialAdmin(
-                "admin", "SecurePass123");
-
+        createInitialAdmin();
         try {
             adminService.createInitialAdmin(
-                    "anotherAdmin", "AnotherPass123");
+                    "anotherAdmin", "AnotherPass123",
+                    SECURITY_QUESTION, SECURITY_ANSWER);
             fail("Expected IllegalStateException");
         } catch (IllegalStateException exception) {
             // Expected result
@@ -108,15 +98,11 @@ public class AdminServiceTest {
 
     @Test
     public void passwordCanBeChanged() throws SQLException {
-        adminService.createInitialAdmin(
-                "admin", "SecurePass123");
-
+        createInitialAdmin();
         assertTrue(adminService.changePassword(
                 "admin", "SecurePass123", "NewSecurePass456"));
-
         assertFalse(adminService.authenticate(
                 "admin", "SecurePass123"));
-
         assertTrue(adminService.authenticate(
                 "admin", "NewSecurePass456"));
     }
@@ -124,12 +110,9 @@ public class AdminServiceTest {
     @Test
     public void passwordChangeFailsWithIncorrectCurrentPassword()
             throws SQLException {
-        adminService.createInitialAdmin(
-                "admin", "SecurePass123");
-
+        createInitialAdmin();
         assertFalse(adminService.changePassword(
                 "admin", "WrongPassword123", "NewSecurePass456"));
-
         assertTrue(adminService.authenticate(
                 "admin", "SecurePass123"));
     }
@@ -137,10 +120,66 @@ public class AdminServiceTest {
     @Test
     public void shortPasswordIsRejected() throws SQLException {
         try {
-            adminService.createInitialAdmin("admin", "short");
+            adminService.createInitialAdmin(
+                    "admin", "short",
+                    SECURITY_QUESTION, SECURITY_ANSWER);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException exception) {
             // Expected result
         }
+    }
+
+    @Test
+    public void recoveryQuestionCanResetPasswordWithNormalizedAnswer()
+            throws SQLException {
+        createInitialAdmin();
+        assertEquals(
+                SECURITY_QUESTION,
+                adminService.getSecurityQuestion("admin").orElseThrow());
+        assertTrue(adminService.resetPassword(
+                "admin", "  NORTH SCHOOL ", "RecoveredPass789"));
+        assertTrue(adminService.authenticate(
+                "admin", "RecoveredPass789"));
+        assertFalse(adminService.authenticate(
+                "admin", "SecurePass123"));
+    }
+
+    @Test
+    public void recoveryRejectsIncorrectAnswer() throws SQLException {
+        createInitialAdmin();
+        assertFalse(adminService.resetPassword(
+                "admin", "Wrong answer", "RecoveredPass789"));
+        assertTrue(adminService.authenticate(
+                "admin", "SecurePass123"));
+    }
+
+    @Test
+    public void authenticatedAdminCanSetUpRecovery() throws SQLException {
+        createInitialAdmin();
+
+        assertTrue(adminService.configureRecovery(
+                "admin", "SecurePass123",
+                "What city were you born in?", "Halifax"));
+        assertTrue(adminService.resetPassword(
+                "admin", "halifax", "RecoveredPass789"));
+        assertTrue(adminService.authenticate(
+                "admin", "RecoveredPass789"));
+    }
+
+    @Test
+    public void recoveryQuestionIsRequiredForNewAdmin() throws SQLException {
+        try {
+            adminService.createInitialAdmin(
+                    "admin", "SecurePass123", " ", SECURITY_ANSWER);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException exception) {
+            assertTrue(exception.getMessage().contains("security question"));
+        }
+    }
+
+    private void createInitialAdmin() throws SQLException {
+        assertTrue(adminService.createInitialAdmin(
+                "admin", "SecurePass123",
+                SECURITY_QUESTION, SECURITY_ANSWER));
     }
 }

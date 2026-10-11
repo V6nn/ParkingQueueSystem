@@ -1,6 +1,7 @@
 package com.parking.database;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -30,11 +31,50 @@ public class DatabaseInitializer {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT NOT NULL UNIQUE,
                     password_hash TEXT NOT NULL,
+                    security_question TEXT,
+                    security_answer_hash TEXT,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """;
 
         statement.execute(sql);
+    }
+
+    private static void ensureAdminRecoveryColumns(Statement statement)
+            throws SQLException {
+        boolean hasQuestion = false;
+        boolean hasAnswerHash = false;
+
+        try (ResultSet columns =
+                     statement.executeQuery("PRAGMA table_info(admins)")) {
+            while (columns.next()) {
+                String name = columns.getString("name");
+                hasQuestion |= "security_question".equals(name);
+                hasAnswerHash |= "security_answer_hash".equals(name);
+            }
+        }
+
+        if (!hasQuestion) {
+            statement.execute("""
+                    ALTER TABLE admins
+                    ADD COLUMN security_question TEXT
+                    """);
+        }
+
+        if (!hasAnswerHash) {
+            statement.execute("""
+                    ALTER TABLE admins
+                    ADD COLUMN security_answer_hash TEXT
+                    """);
+        }
+    }
+
+    private static void createSingleAdminIndex(Statement statement)
+            throws SQLException {
+        statement.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS one_admin_account
+                ON admins ((1))
+                """);
     }
 
     public static void initialize() {
@@ -44,13 +84,17 @@ public class DatabaseInitializer {
             createParkingLotTable(statement);
             createSingleParkingLotIndex(statement);
             createAdminsTable(statement);
+            ensureAdminRecoveryColumns(statement);
+            createSingleAdminIndex(statement);
             createEntrancesTable(statement);
             createExitsTable(statement);
             createParkingRecordsTable(statement);
             createEntranceRecordsTable(statement);
+            ensureEntranceObservationDurationColumn(statement);
             createExitRecordsTable(statement);
             createCongestionRulesTable(statement);
             createRecommendationsTable(statement);
+            createVehicleTransactionsTable(statement);
 
             System.out.println("Database initialized successfully.");
 
@@ -58,6 +102,108 @@ public class DatabaseInitializer {
             throw new IllegalStateException(
                     "Database initialization failed.", e);
         }
+    }
+
+    private static void createVehicleTransactionsTable(
+            Statement statement) throws SQLException {
+
+        boolean tableExists;
+
+        try (ResultSet result = statement.executeQuery("""
+                SELECT sql
+                FROM sqlite_master
+                WHERE type = 'table'
+                AND name = 'vehicle_transactions'
+                """)) {
+
+            tableExists = result.next();
+
+            if (tableExists) {
+                String tableSql = result.getString("sql");
+
+                // The table is already migrated.
+                if (tableSql.contains("'PROCESSING'")
+                        && tableSql.contains("'OCCUPIED'")) {
+
+                    createActiveVehicleIndex(statement);
+                    return;
+                }
+            }
+        }
+
+        if (tableExists) {
+            // Remove the old index before renaming the legacy table.
+            statement.execute("""
+                    DROP INDEX IF EXISTS unique_active_vehicle_plate
+                    """);
+
+            statement.execute("""
+                    ALTER TABLE vehicle_transactions
+                    RENAME TO vehicle_transactions_legacy
+                    """);
+        }
+
+        statement.execute("""
+                CREATE TABLE vehicle_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plate_number TEXT NOT NULL,
+                    vehicle_type TEXT NOT NULL
+                        CHECK (vehicle_type IN ('CAR', 'MOTORCYCLE')),
+                    amount REAL NOT NULL CHECK (amount >= 0),
+                    payment_status TEXT NOT NULL
+                        CHECK (payment_status IN (
+                            'PAID', 'PROCESSING', 'FAILED'
+                        )),
+                    parking_status TEXT NOT NULL
+                        CHECK (parking_status IN (
+                            'RESERVED', 'OCCUPIED', 'AVAILABLE'
+                        )),
+                    created_at TEXT NOT NULL,
+                    scheduled_arrival TEXT,
+                    entered_at TEXT,
+                    exited_at TEXT
+                )
+                """);
+
+        if (tableExists) {
+            // Preserve old records and map the previous statuses.
+            statement.execute("""
+                    INSERT INTO vehicle_transactions (
+                        id, plate_number, vehicle_type, amount,
+                        payment_status, parking_status, created_at
+                    )
+                    SELECT
+                        id,
+                        plate_number,
+                        vehicle_type,
+                        amount,
+                        payment_status,
+                        CASE parking_status
+                            WHEN 'PARKED' THEN 'OCCUPIED'
+                            WHEN 'EXITED' THEN 'AVAILABLE'
+                            ELSE parking_status
+                        END,
+                        created_at
+                    FROM vehicle_transactions_legacy
+                    """);
+
+            statement.execute("""
+                    DROP TABLE vehicle_transactions_legacy
+                    """);
+        }
+
+        createActiveVehicleIndex(statement);
+    }
+
+    private static void createActiveVehicleIndex(Statement statement)
+            throws SQLException {
+
+        statement.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                unique_active_vehicle_plate
+                ON vehicle_transactions (plate_number)
+                WHERE parking_status IN ('RESERVED', 'OCCUPIED')
+                """);
     }
 
     private static void createParkingLotTable(Statement statement)
@@ -146,6 +292,10 @@ public class DatabaseInitializer {
                     average_service_time REAL NOT NULL CHECK (
                         average_service_time >= 0
                     ),
+                    observation_duration_minutes REAL CHECK (
+                        observation_duration_minutes IS NULL
+                        OR observation_duration_minutes > 0
+                    ),
                     FOREIGN KEY (entrance_id)
                         REFERENCES entrances(id)
                         ON UPDATE CASCADE
@@ -154,6 +304,28 @@ public class DatabaseInitializer {
                 """;
 
         statement.execute(sql);
+    }
+
+    private static void ensureEntranceObservationDurationColumn(
+            Statement statement) throws SQLException {
+
+        try (ResultSet columns =
+                     statement.executeQuery("PRAGMA table_info(entrance_records)")) {
+            while (columns.next()) {
+                if ("observation_duration_minutes"
+                        .equals(columns.getString("name"))) {
+                    return;
+                }
+            }
+        }
+
+        statement.execute("""
+                ALTER TABLE entrance_records
+                ADD COLUMN observation_duration_minutes REAL CHECK (
+                    observation_duration_minutes IS NULL
+                    OR observation_duration_minutes > 0
+                )
+                """);
     }
 
     private static void createExitRecordsTable(Statement statement)

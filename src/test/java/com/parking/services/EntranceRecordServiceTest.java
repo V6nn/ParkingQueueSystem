@@ -69,7 +69,7 @@ public class EntranceRecordServiceTest {
     public void saveAndFindLatestRecord() throws SQLException {
         EntranceRecord record = new EntranceRecord(
                 0, entranceId, "2099-01-01 10:00:00",
-                5, 10, 2.5);
+                5, 10, 2.5, 5.0);
 
         service.save(record);
         firstRecordId = record.getId();
@@ -84,6 +84,27 @@ public class EntranceRecordServiceTest {
         assertEquals(5, result.get().getQueueLength());
         assertEquals(10, result.get().getVehiclesEntered());
         assertEquals(2.5, result.get().getAverageServiceTime(), 0.001);
+        assertEquals(5.0,
+                result.get().getObservationDurationMinutes(), 0.001);
+    }
+
+    @Test
+    public void missingServiceTimeRemainsUnavailableAfterPersistence()
+            throws SQLException {
+        EntranceRecord record = new EntranceRecord(
+                0, entranceId, "2099-01-07 10:00:00",
+                2, 0, null, 5.0);
+
+        service.save(record);
+        firstRecordId = record.getId();
+
+        Optional<EntranceRecord> result =
+                service.findLatestByEntranceId(entranceId);
+
+        assertTrue(result.isPresent());
+        assertNull(result.get().getAverageServiceTime());
+        assertEquals(5.0,
+                result.get().getObservationDurationMinutes(), 0.001);
     }
 
     @Test
@@ -175,6 +196,24 @@ public class EntranceRecordServiceTest {
             assertTrue(expected.getMessage().contains(
                     "Average service time"));
         }
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectZeroAverageServiceTime() throws SQLException {
+        EntranceRecord record = new EntranceRecord(
+                0, entranceId, "2099-01-08 10:00:00",
+                2, 5, 0.0);
+
+        service.save(record);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectZeroObservationDuration() throws SQLException {
+        EntranceRecord record = new EntranceRecord(
+                0, entranceId, "2099-01-09 10:00:00",
+                2, 5, 30.0, 0.0);
+
+        service.save(record);
     }
 
     @Test(expected = IllegalArgumentException.class)

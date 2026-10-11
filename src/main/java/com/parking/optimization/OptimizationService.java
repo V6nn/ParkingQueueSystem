@@ -8,6 +8,7 @@ import com.parking.services.EntranceService;
 import com.parking.services.ParkingRecordService;
 import com.parking.models.ParkingLot;
 import com.parking.services.ParkingLotService;
+import com.parking.queueing.QueueingCalculator;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -19,6 +20,8 @@ import java.util.OptionalInt;
  * Connects parking data services to the optimization calculators.
  */
 public class OptimizationService {
+
+    private static final double QUEUE_PREDICTION_MINUTES = 5.0;
 
     private final EntranceService entranceService;
     private final EntranceRecordService entranceRecordService;
@@ -118,6 +121,7 @@ public OptimizationService(
                 );
 
         OptionalDouble estimatedWait = OptionalDouble.empty();
+        OptionalInt predictedQueueLength = OptionalInt.empty();
 
         if (record != null && recommendedLanes.isPresent()) {
             estimatedWait =
@@ -126,6 +130,20 @@ public OptimizationService(
                             recommendedLanes.getAsInt(),
                             record.getAverageServiceTime()
                     );
+
+            Double observationDuration =
+                    record.getObservationDurationMinutes();
+            if (observationDuration != null) {
+                double arrivalRate = QueueingCalculator.calculateArrivalRate(
+                        record.getVehiclesEntered(), observationDuration);
+                predictedQueueLength =
+                        ParkingRecommendationCalculator.predictQueueLength(
+                                queueLength,
+                                arrivalRate,
+                                recommendedLanes.getAsInt(),
+                                record.getAverageServiceTime(),
+                                QUEUE_PREDICTION_MINUTES);
+            }
         }
 
         OptionalInt recommendedCapacity = OptionalInt.empty();
@@ -165,6 +183,7 @@ public OptimizationService(
                 record == null ? null : record.getRecordedAt(),
                 recommendedLanes,
                 estimatedWait,
+                predictedQueueLength,
                 recommendedCapacity,
                 parkingRecord == null
                         ? null
@@ -183,6 +202,7 @@ public OptimizationService(
         private final String queueRecordedAt;
         private final OptionalInt recommendedLanes;
         private final OptionalDouble estimatedWaitMinutes;
+        private final OptionalInt predictedQueueLength;
         private final OptionalInt recommendedCapacity;
         private final String parkingRecordedAt;
 
@@ -193,6 +213,7 @@ public OptimizationService(
                 String queueRecordedAt,
                 OptionalInt recommendedLanes,
                 OptionalDouble estimatedWaitMinutes,
+                OptionalInt predictedQueueLength,
                 OptionalInt recommendedCapacity,
                 String parkingRecordedAt) {
 
@@ -202,6 +223,7 @@ public OptimizationService(
             this.queueRecordedAt = queueRecordedAt;
             this.recommendedLanes = recommendedLanes;
             this.estimatedWaitMinutes = estimatedWaitMinutes;
+            this.predictedQueueLength = predictedQueueLength;
             this.recommendedCapacity = recommendedCapacity;
             this.parkingRecordedAt = parkingRecordedAt;
         }
@@ -228,6 +250,10 @@ public OptimizationService(
 
         public OptionalDouble getEstimatedWaitMinutes() {
             return estimatedWaitMinutes;
+        }
+
+        public OptionalInt getPredictedQueueLength() {
+            return predictedQueueLength;
         }
 
         public OptionalInt getRecommendedCapacity() {

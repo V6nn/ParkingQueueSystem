@@ -44,6 +44,16 @@ mvn clean test
 
 The project has successfully built with Maven in prior work. Service-layer save/retrieval checks also passed for all six services using temporary test data. Always rerun the build after code changes; do not assume the current checkout is identical.
 
+### Parkflow access
+
+Launch `com.parking.App` to open the Parkflow sign-in screen. On a new database,
+create the single administrator account with a password and recovery question
+and answer. The answer is normalized and stored as a salted password hash. Use
+the sign-in form to access the dashboard; the Driver Window can be opened
+without signing in. Password recovery verifies the saved answer before
+updating the password. Existing administrator accounts are retained during
+migration and can set their recovery question after signing in.
+
 ## 3. Team roles and package ownership
 
 ### Person 1 — Database and data management
@@ -283,7 +293,9 @@ Person 1 has created these services under `com.parking.services`:
 * `EntranceRecordService.findLatestByEntranceId(int)` and `ExitRecordService.findLatestByExitId(int)` return `Optional` results.
 * Entrance and exit history lookup methods return lists ordered newest first.
 * Record timestamps use `yyyy-MM-dd HH:mm:ss`.
-* `EntranceRecord.averageServiceTime` is stored as a numeric value. The team must use **seconds per vehicle** consistently and convert units explicitly when calculating rates or waiting times.
+* `EntranceRecord.averageServiceTime` is optional and, when present, is **seconds per vehicle**. Missing service time remains unavailable and does not produce a wait estimate or queue forecast; zero is not a valid service time.
+* Entrance observations may include an observation duration in minutes. The dashboard predicts queue length five minutes ahead only when this duration is recorded, using vehicles entered during the interval as a constant arrival rate; historical observations without a duration remain usable for lane and wait estimates but do not produce a queue forecast.
+* The displayed wait estimate covers the observed queue only and assumes no new arrivals. The five-minute queue forecast instead assumes the observed arrival and service rates remain constant; neither calculation is a stochastic guarantee.
 
 Check the current Java source for exact signatures and exceptions before calling a method. The database and service layer are the shared persistence interface for Person 2 and Person 3; their modules should not create duplicate database access code.
 

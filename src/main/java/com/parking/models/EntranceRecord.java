@@ -7,7 +7,8 @@ public class EntranceRecord {
     private String recordedAt;
     private int queueLength;
     private int vehiclesEntered;
-    private double averageServiceTime;
+    private Double averageServiceTime;
+    private Double observationDurationMinutes;
 
     public EntranceRecord() {
     }
@@ -15,12 +16,21 @@ public class EntranceRecord {
     public EntranceRecord(int id, int entranceId, String recordedAt,
                           int queueLength, int vehiclesEntered,
                           double averageServiceTime) {
+        this(id, entranceId, recordedAt, queueLength, vehiclesEntered,
+                Double.valueOf(averageServiceTime), null);
+    }
+
+    public EntranceRecord(int id, int entranceId, String recordedAt,
+                          int queueLength, int vehiclesEntered,
+                          Double averageServiceTime,
+                          Double observationDurationMinutes) {
         this.id = id;
         this.entranceId = entranceId;
         this.recordedAt = recordedAt;
         this.queueLength = queueLength;
         this.vehiclesEntered = vehiclesEntered;
         this.averageServiceTime = averageServiceTime;
+        this.observationDurationMinutes = observationDurationMinutes;
     }
 
     public int getId() {
@@ -63,11 +73,20 @@ public class EntranceRecord {
         this.vehiclesEntered = vehiclesEntered;
     }
 
-    public double getAverageServiceTime() {
+    public Double getAverageServiceTime() {
         return averageServiceTime;
     }
 
-    public void setAverageServiceTime(double averageServiceTime) {
+    public void setAverageServiceTime(Double averageServiceTime) {
         this.averageServiceTime = averageServiceTime;
+    }
+
+    public Double getObservationDurationMinutes() {
+        return observationDurationMinutes;
+    }
+
+    public void setObservationDurationMinutes(
+            Double observationDurationMinutes) {
+        this.observationDurationMinutes = observationDurationMinutes;
     }
 }

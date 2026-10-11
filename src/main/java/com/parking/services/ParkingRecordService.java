@@ -54,7 +54,7 @@ public class ParkingRecordService {
         String sql = """
                 SELECT *
                 FROM parking_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 """;
 
         List<ParkingRecord> records = new ArrayList<>();
@@ -76,7 +76,7 @@ public class ParkingRecordService {
         String sql = """
                 SELECT *
                 FROM parking_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 LIMIT 1
                 """;
 

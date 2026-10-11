@@ -20,8 +20,9 @@ public class EntranceRecordService {
         String sql = """
                 INSERT INTO entrance_records
                 (entrance_id, recorded_at, queue_length,
-                 vehicles_entered, average_service_time)
-                VALUES (?, ?, ?, ?, ?)
+                 vehicles_entered, average_service_time,
+                 observation_duration_minutes)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """;
 
         try (Connection connection = DatabaseConnection.connect();
@@ -32,7 +33,8 @@ public class EntranceRecordService {
             statement.setString(2, record.getRecordedAt());
             statement.setInt(3, record.getQueueLength());
             statement.setInt(4, record.getVehiclesEntered());
-            statement.setDouble(5, record.getAverageServiceTime());
+            setAverageServiceTime(statement, 5, record);
+            setObservationDuration(statement, 6, record);
 
             statement.executeUpdate();
 
@@ -63,15 +65,16 @@ public class EntranceRecordService {
         String occupancySql = """
                 SELECT occupied_spaces
                 FROM parking_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 LIMIT 1
                 """;
 
         String entranceSql = """
                 INSERT INTO entrance_records
                 (entrance_id, recorded_at, queue_length,
-                vehicles_entered, average_service_time)
-                VALUES (?, ?, ?, ?, ?)
+                vehicles_entered, average_service_time,
+                observation_duration_minutes)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """;
 
         String parkingSql = """
@@ -135,8 +138,8 @@ public class EntranceRecordService {
                     statement.setString(2, record.getRecordedAt());
                     statement.setInt(3, record.getQueueLength());
                     statement.setInt(4, vehiclesEntered);
-                    statement.setDouble(
-                            5, record.getAverageServiceTime());
+                    setAverageServiceTime(statement, 5, record);
+                    setObservationDuration(statement, 6, record);
 
                     statement.executeUpdate();
                 }
@@ -181,7 +184,7 @@ public class EntranceRecordService {
         String sql = """
                 SELECT *
                 FROM entrance_records
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 """;
 
         List<EntranceRecord> records = new ArrayList<>();
@@ -211,7 +214,7 @@ public class EntranceRecordService {
                 SELECT *
                 FROM entrance_records
                 WHERE entrance_id = ?
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 """;
 
         List<EntranceRecord> records = new ArrayList<>();
@@ -244,7 +247,7 @@ public class EntranceRecordService {
                 SELECT *
                 FROM entrance_records
                 WHERE entrance_id = ?
-                ORDER BY recorded_at DESC, id DESC
+                ORDER BY datetime(recorded_at) DESC, id DESC
                 LIMIT 1
                 """;
 
@@ -287,15 +290,55 @@ public class EntranceRecordService {
                     "Vehicles entered cannot be negative.");
         }
 
-        if (!Double.isFinite(record.getAverageServiceTime())
-                || record.getAverageServiceTime() < 0) {
+        Double averageServiceTime = record.getAverageServiceTime();
+        if (averageServiceTime != null
+                && (!Double.isFinite(averageServiceTime)
+                || averageServiceTime <= 0)) {
             throw new IllegalArgumentException(
-                    "Average service time must be finite and non-negative.");
+                    "Average service time must be positive and finite when provided.");
+        }
+
+        Double duration = record.getObservationDurationMinutes();
+        if (duration != null
+                && (!Double.isFinite(duration) || duration <= 0)) {
+            throw new IllegalArgumentException(
+                    "Observation duration must be a positive finite number.");
+        }
+    }
+
+    private void setAverageServiceTime(
+            PreparedStatement statement,
+            int parameterIndex,
+            EntranceRecord record) throws SQLException {
+
+        Double averageServiceTime = record.getAverageServiceTime();
+        statement.setDouble(
+                parameterIndex,
+                averageServiceTime == null ? 0.0 : averageServiceTime);
+    }
+
+    private void setObservationDuration(
+            PreparedStatement statement,
+            int parameterIndex,
+            EntranceRecord record) throws SQLException {
+
+        Double duration = record.getObservationDurationMinutes();
+        if (duration == null) {
+            statement.setNull(parameterIndex, java.sql.Types.REAL);
+        } else {
+            statement.setDouble(parameterIndex, duration);
         }
     }
 
     private EntranceRecord mapRow(ResultSet resultSet)
             throws SQLException {
+
+        double duration = resultSet.getDouble("observation_duration_minutes");
+        Double observationDurationMinutes =
+                resultSet.wasNull() ? null : duration;
+        double serviceTime = resultSet.getDouble("average_service_time");
+        Double averageServiceTime = resultSet.wasNull() || serviceTime <= 0
+                ? null : serviceTime;
 
         return new EntranceRecord(
                 resultSet.getInt("id"),
@@ -303,7 +346,8 @@ public class EntranceRecordService {
                 resultSet.getString("recorded_at"),
                 resultSet.getInt("queue_length"),
                 resultSet.getInt("vehicles_entered"),
-                resultSet.getDouble("average_service_time")
+                averageServiceTime,
+                observationDurationMinutes
         );
     }
 }

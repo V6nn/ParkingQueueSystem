@@ -29,7 +29,16 @@ public class QueueingCalculator {
                     "Vehicles served must be greater than zero.");
         }
 
-        return totalServiceTimeSeconds / vehiclesServed;
+        double averageServiceTime =
+                totalServiceTimeSeconds / vehiclesServed;
+
+        if (!Double.isFinite(averageServiceTime)
+                || averageServiceTime <= 0) {
+            throw new IllegalArgumentException(
+                    "Average service time is outside the supported numeric range.");
+        }
+
+        return averageServiceTime;
     }
 
     /**
@@ -44,7 +53,14 @@ public class QueueingCalculator {
                     "Average service time must be a positive number.");
         }
 
-        return 60.0 / averageServiceTimeSeconds;
+        double serviceRate = 60.0 / averageServiceTimeSeconds;
+
+        if (!Double.isFinite(serviceRate) || serviceRate <= 0) {
+            throw new IllegalArgumentException(
+                    "Average service time produces an invalid service rate.");
+        }
+
+        return serviceRate;
     }
 
     /**
@@ -70,8 +86,18 @@ public class QueueingCalculator {
                 calculateServiceRate(averageServiceTimeSeconds);
 
         double totalServiceRate = serviceRate * activeLanes;
+        if (!Double.isFinite(totalServiceRate) || totalServiceRate <= 0) {
+            throw new IllegalArgumentException(
+                    "Combined service rate is outside the supported numeric range.");
+        }
 
-        return queueLength / totalServiceRate;
+        double waitMinutes = queueLength / totalServiceRate;
+        if (!Double.isFinite(waitMinutes)) {
+            throw new IllegalArgumentException(
+                    "Estimated waiting time is outside the supported numeric range.");
+        }
+
+        return waitMinutes;
     }
 
     /**
@@ -92,7 +118,14 @@ public class QueueingCalculator {
                     "Observation time must be a positive number.");
         }
 
-        return vehiclesArrived / observationMinutes;
+        double arrivalRate = vehiclesArrived / observationMinutes;
+
+        if (!Double.isFinite(arrivalRate)) {
+            throw new IllegalArgumentException(
+                    "Arrival rate is outside the supported numeric range.");
+        }
+
+        return arrivalRate;
     }
 
     /**

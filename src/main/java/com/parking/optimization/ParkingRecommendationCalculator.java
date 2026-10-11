@@ -45,9 +45,8 @@ public final class ParkingRecommendationCalculator {
             return OptionalInt.empty();
         }
 
-        int proposedLanes = Math.max(1,
-                (int) Math.ceil(
-                        (double) observedQueueLength / targetQueuePerLane));
+        int proposedLanes = (int) Math.ceil(
+                (double) observedQueueLength / targetQueuePerLane);
 
         int recommendedLanes =
                 OptimizationRuleCalculator.limitRecommendedLanes(
@@ -92,7 +91,7 @@ public final class ParkingRecommendationCalculator {
 
         if (!OptimizationRuleCalculator.hasValidQueueObservation(
                 currentQueueLength)
-                || recommendedLanes <= 0
+                || recommendedLanes < 0
                 || averageServiceTimeSeconds == null
                 || !Double.isFinite(averageServiceTimeSeconds)
                 || averageServiceTimeSeconds <= 0
